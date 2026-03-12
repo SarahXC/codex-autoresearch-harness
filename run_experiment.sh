@@ -50,28 +50,42 @@ fi
 # Create an isolated working copy so multiple models can run sequentially
 # without stepping on each other's git state.
 # ---------------------------------------------------------------------------
+AUTORESEARCH_DIR="${AUTORESEARCH_REPO:-$SOURCE_DIR/autoresearch}"
+if [ ! -d "$AUTORESEARCH_DIR" ]; then
+    echo "ERROR: Cannot find autoresearch repo at $AUTORESEARCH_DIR"
+    echo "Either clone it there or set AUTORESEARCH_REPO=/path/to/autoresearch"
+    exit 1
+fi
+
+# Find the baseline commit: use BASE_COMMIT env var, or default to HEAD of
+# the source repo's current branch (usually master). Both models MUST start
+# from the same commit for a fair comparison.
+BASE_COMMIT="${BASE_COMMIT:-$(cd "$AUTORESEARCH_DIR" && git rev-parse HEAD)}"
+echo "Base commit: $BASE_COMMIT"
+
 if [ ! -d "$WORK_DIR" ]; then
     echo "Creating working copy at $WORK_DIR ..."
-    # Copy the autoresearch repo (the one with train.py, program.md, etc.)
-    AUTORESEARCH_DIR="${AUTORESEARCH_REPO:-$SOURCE_DIR/autoresearch}"
-    if [ ! -d "$AUTORESEARCH_DIR" ]; then
-        echo "ERROR: Cannot find autoresearch repo at $AUTORESEARCH_DIR"
-        echo "Either clone it there or set AUTORESEARCH_REPO=/path/to/autoresearch"
-        exit 1
-    fi
     cp -r "$AUTORESEARCH_DIR" "$WORK_DIR"
 fi
 
 cd "$WORK_DIR"
 
-# Create a dedicated git branch for this run
-if ! git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
-    git checkout -b "$BRANCH"
-    echo "Created branch $BRANCH"
-else
-    git checkout "$BRANCH"
-    echo "Switched to existing branch $BRANCH"
-fi
+# ---------------------------------------------------------------------------
+# CRITICAL: Always reset to the base commit before creating the branch.
+# This ensures every model starts from identical code, even if a previous
+# run left changes on the branch or working tree.
+# ---------------------------------------------------------------------------
+git checkout master 2>/dev/null || git checkout main 2>/dev/null || true
+git reset --hard "$BASE_COMMIT"
+echo "Reset working copy to $BASE_COMMIT"
+
+# Create a fresh branch for this run (delete old one if it exists)
+git branch -D "$BRANCH" 2>/dev/null || true
+git checkout -b "$BRANCH"
+echo "Created fresh branch $BRANCH from $BASE_COMMIT"
+
+# Clean any leftover results from previous runs
+rm -f results.tsv timing.log output.log run.log
 
 TIMING_LOG="${WORK_DIR}/timing.log"
 
