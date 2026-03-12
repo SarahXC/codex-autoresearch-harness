@@ -1,0 +1,11 @@
+# Results (generated per-run)
+results.tsv
+timing.log
+output.log
+run.log
+
+# Working copies
+autoresearch_*/
+
+# OS
+.DS_Store
