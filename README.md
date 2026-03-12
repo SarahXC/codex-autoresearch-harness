@@ -347,27 +347,62 @@ b187561  1.004864  24.2       discard  raise final LR floor to 4%
 **Best val_bpb: 1.004680** (baseline: 1.006479, -0.18%)
 Accept rate: 67% (8/12)
 
-### GPT-5.3-Codex / Spark (6 hours, partial results at ~3h)
+### GPT-5.3-Codex / Spark (6 hours, 57 iterations, 57 experiments logged)
 
 ```
 commit   val_bpb   memory_gb  status   description
 c2450ad  1.040068  44.0       keep     baseline
 b0664e5  1.038591  44.0       keep     shorten LR warmdown ratio 0.5->0.2
+53a5951  1.043356  44.0       discard  set final LR fraction to 0.2 during warmdown
+97531a6  1.051930  44.0       discard  shorten LR warmdown ratio 0.2->0.1
+ecd93b6  1.043613  44.0       discard  set final LR floor to 5%
+67015e7  1.040634  44.0       discard  add 2% LR warmup ratio
+7324c6a  1.044779  44.0       discard  lower Muon matrix LR from 0.04 to 0.035
+1831c18  1.051843  44.0       discard  set LR warmdown ratio to 0.15
+111bb14  1.056355  44.0       discard  increase Muon matrix LR from 0.04 to 0.045
+e77f6cf  1.043794  44.0       discard  reduce Muon weight decay 0.2->0.15
+9807c11  1.048427  44.0       discard  lower Muon matrix LR from 0.04 to 0.038
 7f7facb  1.038025  44.0       keep     extend LR warmdown ratio 0.2->0.25
 2f5bad1  1.037462  44.0       keep     extend LR warmdown ratio 0.25->0.30
+d85f830  1.040809  44.0       discard  extend LR warmdown ratio 0.30->0.35
+7a2e87b  1.039719  44.0       discard  tighten LR warmdown ratio 0.30->0.28
+b70413d  1.041337  44.0       discard  extend LR warmdown ratio 0.30->0.32
+5b70122  1.041577  44.0       discard  set final LR fraction to 1% during warmdown
+c739e0f  1.046642  44.0       discard  reduce Muon weight decay 0.20->0.18
+18c2625  1.040285  44.0       discard  increase Muon weight decay 0.20->0.22
 c335b68  1.031333  44.0       keep     tune warmdown ratio 0.30->0.29
-...
-(18 experiments discarded — mostly LR, weight decay, warmdown fine-tuning)
+...                                     (12 discarded — warmdown micro-tuning)
+ca9f304  1.030539  44.0       keep     ramp Muon momentum to 0.95 over 200 steps
+7227edc  1.030434  44.0       keep     tune Muon momentum ramp target 0.95->0.94
+...                                     (16 discarded — momentum ramp micro-tuning)
+bb218a4  1.030148  44.0       keep     lower Muon momentum ramp start 0.85->0.83
+...                                     (8 discarded — weight decay & momentum variants)
+f5729a0  1.033917  44.0       discard  set Muon weight decay floor to 50% at end
 ```
 
-**Best val_bpb: 1.031333** (baseline: 1.040068, -0.84%)
-Accept rate: 17% (5/29)
+**Best val_bpb: 1.030148** (baseline: 1.040068, -0.95%)
+Accept rate: 16% (9/57)
+
+### Head-to-head
+
+| | **GPT-5.4** | **GPT-5.3-Codex (Spark)** |
+|---|---|---|
+| Total time | 6h | 6h |
+| Iterations | 52 | 57 |
+| Experiments logged | 12 | 57 |
+| Accepted | 8 (67%) | 9 (16%) |
+| Baseline val_bpb | 1.006479 | 1.040068 |
+| **Best val_bpb** | **1.004680** | **1.030148** |
+| Improvement over baseline | -0.17% | -0.95% |
+| Avg time/iter | ~421s | ~383s |
 
 ### Key Observations
 
-- **GPT-5.4 has much higher reasoning quality**: 67% accept rate vs 17%. It found the LR warmdown improvement quickly and systematically hill-climbed through it.
-- **Spark is ~35s faster per iteration** (~385s vs ~420s), but the 5-minute fixed training time dominates, so faster inference only saves ~8%.
-- **Both models independently discovered the same winning strategy**: LR warmdown scheduling is the biggest lever for this architecture.
+- **Reasoning quality dominates throughput.** GPT-5.4 landed 67% of its experiments vs 16% for Spark. It found the LR warmdown strategy early and methodically hill-climbed (70% → 80% → 90% → 95% → 100%), while Spark spent its first 10 experiments scattershot before finding the same insight.
+- **Spark ran more experiments** (57 vs 12) thanks to faster inference (~383s vs ~421s per iteration). But the 5-minute fixed training time dominates each iteration, so faster inference only saves ~38s — about 9%.
+- **Both models independently discovered the same winning strategies.** LR warmdown scheduling was the biggest lever. Spark also found a novel Muon momentum ramp trick that 5.4 didn't explore.
+- **This benchmark favors reasoning quality over inference speed.** When training is 5 minutes and reasoning is ~1 minute, compressing the reasoning step doesn't change the game. Spark's speed advantage would matter much more in workloads where the agent thinks more than it trains — code review, multi-file refactoring, or autoresearch with shorter training budgets.
+- **The baselines differ** (1.006 vs 1.040) because 5.4's early iterations made changes that persisted before the experiment counter was fully tracking. This means the absolute val_bpb numbers aren't directly comparable, but the relative improvement patterns and accept rates are.
 
 ## Customization
 
