@@ -50,7 +50,7 @@ fi
 # Create an isolated working copy so multiple models can run sequentially
 # without stepping on each other's git state.
 # ---------------------------------------------------------------------------
-AUTORESEARCH_DIR="${AUTORESEARCH_REPO:-$SOURCE_DIR/autoresearch}"
+AUTORESEARCH_DIR="${AUTORESEARCH_REPO:-$HOME/autoresearch}"
 if [ ! -d "$AUTORESEARCH_DIR" ]; then
     echo "ERROR: Cannot find autoresearch repo at $AUTORESEARCH_DIR"
     echo "Either clone it there or set AUTORESEARCH_REPO=/path/to/autoresearch"
