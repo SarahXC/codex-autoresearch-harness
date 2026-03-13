@@ -322,87 +322,80 @@ Each training run uses 100% GPU for 5 minutes. You can't run two models in paral
 
 Bash tool calls and tmux don't always source `.bashrc` (it has a non-interactive guard). The harness scripts check for `OPENAI_API_KEY` explicitly and fail fast if it's missing.
 
-## Example Results
+## Results
 
-From our run comparing GPT-5.4 vs GPT-5.3-Codex (Spark/Cerebras) on a single H100:
+From our run comparing GPT-5.4 vs GPT-5.3-Codex (Spark/Cerebras) on a single H100. Both models started from the same commit (`c2450ad`) with identical, unmodified `train.py`.
 
-### GPT-5.4 (6 hours, 52 iterations, 12 experiments logged)
+### GPT-5.4 (6 hours, 54 iterations, 53 experiments)
 
 ```
 commit   val_bpb   memory_gb  status   description
-d606aad  1.006479  24.2       keep     baseline
-10ad113  1.008087  24.2       discard  add 2% LR warmup
-f92266a  1.005982  24.2       keep     extend LR warmdown to 70%
-97981ac  1.005437  24.2       keep     extend LR warmdown to 80%
-b5c5856  1.005397  24.2       keep     extend LR warmdown to 90%
-d908e8b  1.005321  24.2       keep     extend LR warmdown to 95%
-2b577c6  1.005265  24.2       keep     extend LR warmdown to 100%
-1a63e8e  1.004922  24.2       keep     add 5% LR floor at end of warmdown
-10c74b0  1.007305  24.2       discard  raise final LR floor to 10%
-4405ef6  1.004680  24.2       keep     lower final LR floor to 3%
-c2b8e6a  1.004691  24.2       discard  lower final LR floor to 2%
-b187561  1.004864  24.2       discard  raise final LR floor to 4%
+c2450ad  1.033848  44.0       keep     baseline
+5a05b04  1.038355  44.0       discard  add 5% LR warmup
+60c17f8  1.032859  44.0       keep     keep 10% LR floor during warmdown
+0f7a84e  1.032669  44.0       keep     start warmdown later
+f5100d3  1.032250  44.0       keep     delay warmdown slightly again
+3643f61  1.031680  44.0       keep     raise final LR floor to 15%
+6683761  1.029337  44.0       keep     shorten warmdown slightly
+a8e6dda  1.022395  39.2       keep     reduce depth to 7
+0e08a96  1.013308  39.1       keep     halve total batch size to double update frequency
+ed450b6  1.011270  19.8       keep     halve total batch with 0.7x LRs and smaller device batch
+7195765  1.010736  19.8       keep     lower LR scale for smaller batch
+1f03c5f  1.010230  19.8       keep     lower LR scale another 10%
+1dc230b  1.010159  19.8       keep     lower LR scale another 10% again
+334d84a  1.009999  19.8       keep     lower LR scale another 10% once more
+9d38d90  1.009684  19.8       keep     lengthen warmdown to 35%
+a2feebf  1.009426  19.8       keep     lengthen warmdown to 37.5%
+abcc35d  1.009307  19.8       keep     lengthen warmdown to 40%
+eb3b7b6  1.009076  19.8       keep     lengthen warmdown to 42.5%
+bf23fda  1.008841  19.8       keep     lengthen warmdown to 45%
+a258850  1.008487  19.8       keep     lower Muon weight decay to 0.15 with small batch
+f333383  1.008364  19.8       keep     lower Muon weight decay to 0.10
 ```
 
-**Best val_bpb: 1.004680** (baseline: 1.006479, -0.18%)
-Accept rate: 67% (8/12)
+**Best val_bpb: 1.008364** (baseline: 1.033848, **-2.46%**)
+Accept rate: 40% (21/53). 1 crash, 31 discarded.
 
-### GPT-5.3-Codex / Spark (6 hours, 57 iterations, 57 experiments logged)
+GPT-5.4 made a bold architectural move mid-run: it reduced model depth from 8 to 7 layers and halved the batch size, trading model size for more gradient updates per 5-minute window. That single insight (1.033 → 1.013) was worth more than all of Spark's 57 experiments combined. It then systematically hill-climbed LR scaling and warmdown scheduling to push further to 1.008.
+
+### GPT-5.3-Codex / Spark (6 hours, 57 iterations, 57 experiments)
 
 ```
 commit   val_bpb   memory_gb  status   description
 c2450ad  1.040068  44.0       keep     baseline
 b0664e5  1.038591  44.0       keep     shorten LR warmdown ratio 0.5->0.2
-53a5951  1.043356  44.0       discard  set final LR fraction to 0.2 during warmdown
-97531a6  1.051930  44.0       discard  shorten LR warmdown ratio 0.2->0.1
-ecd93b6  1.043613  44.0       discard  set final LR floor to 5%
-67015e7  1.040634  44.0       discard  add 2% LR warmup ratio
-7324c6a  1.044779  44.0       discard  lower Muon matrix LR from 0.04 to 0.035
-1831c18  1.051843  44.0       discard  set LR warmdown ratio to 0.15
-111bb14  1.056355  44.0       discard  increase Muon matrix LR from 0.04 to 0.045
-e77f6cf  1.043794  44.0       discard  reduce Muon weight decay 0.2->0.15
-9807c11  1.048427  44.0       discard  lower Muon matrix LR from 0.04 to 0.038
 7f7facb  1.038025  44.0       keep     extend LR warmdown ratio 0.2->0.25
 2f5bad1  1.037462  44.0       keep     extend LR warmdown ratio 0.25->0.30
-d85f830  1.040809  44.0       discard  extend LR warmdown ratio 0.30->0.35
-7a2e87b  1.039719  44.0       discard  tighten LR warmdown ratio 0.30->0.28
-b70413d  1.041337  44.0       discard  extend LR warmdown ratio 0.30->0.32
-5b70122  1.041577  44.0       discard  set final LR fraction to 1% during warmdown
-c739e0f  1.046642  44.0       discard  reduce Muon weight decay 0.20->0.18
-18c2625  1.040285  44.0       discard  increase Muon weight decay 0.20->0.22
 c335b68  1.031333  44.0       keep     tune warmdown ratio 0.30->0.29
-...                                     (12 discarded — warmdown micro-tuning)
 ca9f304  1.030539  44.0       keep     ramp Muon momentum to 0.95 over 200 steps
 7227edc  1.030434  44.0       keep     tune Muon momentum ramp target 0.95->0.94
-...                                     (16 discarded — momentum ramp micro-tuning)
 bb218a4  1.030148  44.0       keep     lower Muon momentum ramp start 0.85->0.83
-...                                     (8 discarded — weight decay & momentum variants)
-f5729a0  1.033917  44.0       discard  set Muon weight decay floor to 50% at end
 ```
 
-**Best val_bpb: 1.030148** (baseline: 1.040068, -0.95%)
-Accept rate: 16% (9/57)
+**Best val_bpb: 1.030148** (baseline: 1.040068, **-0.95%**)
+Accept rate: 16% (9/57). 48 discarded.
+
+Spark only tuned hyperparameters — LR warmdown ratios, Muon momentum ramp, weight decay. It never attempted architectural changes like reducing depth or changing batch size. It found a novel Muon momentum ramp trick that 5.4 didn't explore, but stayed within a narrow optimization space.
 
 ### Head-to-head
 
 | | **GPT-5.4** | **GPT-5.3-Codex (Spark)** |
 |---|---|---|
 | Total time | 6h | 6h |
-| Iterations | 52 | 57 |
-| Experiments logged | 12 | 57 |
-| Accepted | 8 (67%) | 9 (16%) |
-| Baseline val_bpb | 1.006479 | 1.040068 |
-| **Best val_bpb** | **1.004680** | **1.030148** |
-| Improvement over baseline | -0.17% | -0.95% |
-| Avg time/iter | ~421s | ~383s |
+| Iterations | 54 | 57 |
+| Experiments | 53 | 57 |
+| Accepted | 21 (40%) | 9 (16%) |
+| Baseline val_bpb | 1.033848 | 1.040068 |
+| **Best val_bpb** | **1.008364** | **1.030148** |
+| Improvement | **-2.46%** | -0.95% |
+| Avg time/iter | ~402s | ~383s |
 
 ### Key Observations
 
-- **Reasoning quality dominates throughput.** GPT-5.4 landed 67% of its experiments vs 16% for Spark. It found the LR warmdown strategy early and methodically hill-climbed (70% → 80% → 90% → 95% → 100%), while Spark spent its first 10 experiments scattershot before finding the same insight.
-- **Spark ran more experiments** (57 vs 12) thanks to faster inference (~383s vs ~421s per iteration). But the 5-minute fixed training time dominates each iteration, so faster inference only saves ~38s — about 9%.
-- **Both models independently discovered the same winning strategies.** LR warmdown scheduling was the biggest lever. Spark also found a novel Muon momentum ramp trick that 5.4 didn't explore.
-- **This benchmark favors reasoning quality over inference speed.** When training is 5 minutes and reasoning is ~1 minute, compressing the reasoning step doesn't change the game. Spark's speed advantage would matter much more in workloads where the agent thinks more than it trains — code review, multi-file refactoring, or autoresearch with shorter training budgets.
-- **The baselines differ** (1.006 vs 1.040) because 5.4's early iterations made changes that persisted before the experiment counter was fully tracking. This means the absolute val_bpb numbers aren't directly comparable, but the relative improvement patterns and accept rates are.
+- **Reasoning quality matters more than speed.** GPT-5.4 landed 40% of its experiments vs 16% for Spark. More importantly, 5.4 made a creative architectural leap (reducing depth + halving batch size) that Spark never attempted. Spark stuck to safe hyperparameter tweaks.
+- **Spark was faster but not by enough.** ~19s saved per iteration (~383s vs ~402s) is about 5%. The fixed 5-minute training run dominates each iteration, so faster inference barely moves the needle.
+- **5.4 found a deeper insight.** The key move was realizing that with a fixed 5-minute time budget, more gradient updates (smaller batch) beat a larger model. This required understanding the relationship between batch size, learning rate, and training dynamics — not just hill-climbing a single hyperparameter.
+- **Both models found warmdown scheduling improvements**, but Spark got stuck there. 5.4 used it as a starting point, then moved on to structural changes.
 
 ## Customization
 
